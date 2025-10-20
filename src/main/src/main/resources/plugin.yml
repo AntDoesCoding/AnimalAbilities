@@ -4,18 +4,18 @@ main: com.animalabilities.AnimalAbilities
 api-version: 1.21
 commands:
   chooseanimal:
-    description: Opens the animal chooser GUI.
+    description: Opens the animal selection menu.
   resetanimal:
-    description: Reset a player's animal (OP only).
+    description: Resets a player's animal choice (OP only).
   pounce:
-    description: Wolf ability (Pounce).
+    description: Wolf ability.
   agilesprint:
-    description: Cat ability (Agile Sprint).
+    description: Cat ability.
   flutterfly:
-    description: Bee ability (Flutter Fly).
+    description: Bee ability.
   fastescape:
-    description: Fox ability (Fast Escape).
+    description: Fox ability.
   woolguard:
-    description: Sheep ability (Wool Guard).
+    description: Sheep ability.
   fastgallop:
-    description: Horse ability (Fast Gallop).
+    description: Horse ability.
