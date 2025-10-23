@@ -27,14 +27,14 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.util.*;
 
 /**
- * Patched AnimalAbilities - runtime-safe enum lookups to avoid missing-constant compile errors.
+ * Final corrected AnimalAbilities - safe lookups + balanced braces.
  */
 public class AnimalAbilities extends JavaPlugin implements Listener {
 
     // player uuid -> chosen animal
     private final Map<UUID, String> chosen = new HashMap<>();
 
-    // player uuid -> ability -> expiryMillis
+    // player uuid -> (ability -> expiryMillis)
     private final Map<UUID, Map<String, Long>> cooldowns = new HashMap<>();
 
     private final Map<String, AbilityMeta> abilityMeta = new HashMap<>();
@@ -52,7 +52,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
-        // init meta
+        // define ability metadata (cooldown seconds, duration seconds)
         abilityMeta.put("pounce", new AbilityMeta("wolf", 6 * 60, 8));
         abilityMeta.put("focus", new AbilityMeta("cat", 7 * 60, 10));
         abilityMeta.put("hover", new AbilityMeta("bee", 4 * 60, 6));
@@ -65,7 +65,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         // load saved choices
         loadChoices();
 
-        // register
+        // register events
         getServer().getPluginManager().registerEvents(this, this);
 
         getLogger().info("AnimalAbilities enabled.");
@@ -139,7 +139,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
             return true;
         }
 
-        // ability commands (defined in plugin.yml)
+        // ability commands
         if (abilityMeta.containsKey(cmd)) {
             if (!(sender instanceof Player p)) {
                 sender.sendMessage("Only players can use abilities.");
@@ -174,7 +174,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
     }
 
     private ItemStack createGuiItem(String materialName, String displayName, String desc, String effects) {
-        Material mat = matchMaterialFallback(materialName);
+        Material mat = safeMatchMaterial(materialName);
         ItemStack it = new ItemStack(mat);
         ItemMeta meta = it.getItemMeta();
         if (meta != null) {
@@ -185,15 +185,13 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         return it;
     }
 
-    private Material matchMaterialFallback(String name) {
+    private Material safeMatchMaterial(String name) {
         Material m = Material.matchMaterial(name);
         if (m != null) return m;
         try {
             return Material.valueOf(name);
-        } catch (Exception ex) {
-            // ultimate fallback
-            return Material.BARRIER;
-        }
+        } catch (Exception ignored) {}
+        return Material.BARRIER;
     }
 
     @EventHandler
@@ -217,8 +215,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         saveChoices();
         p.sendMessage(ChatColor.GREEN + "You are now bonded with the " + ChatColor.AQUA + capitalize(display) + ChatColor.GREEN + "!");
         applyPassive(p);
-        // spawn a safe particle (try to use VILLAGER_HAPPY; fallback handled)
-        spawnParticleOnce(p, "VILLAGER_HAPPY", 20);
+        spawnParticleOnceSafe(p, new String[]{"VILLAGER_HAPPY","HEART","CLOUD"}, 20);
         p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 1f, 1f);
         p.closeInventory();
     }
@@ -241,54 +238,54 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
 
     private void applyPassive(Player p) {
         clearAllEffects(p);
-        String a = chosen.get(p.getUniqueId());
-        if (a == null) return;
+        String animal = chosen.get(p.getUniqueId());
+        if (animal == null) return;
         int perm = Integer.MAX_VALUE - 1000;
 
-        switch (a) {
+        switch (animal) {
             case "wolf":
-                addPotionSafe(p, new String[]{"INCREASE_DAMAGE","STRENGTH"}, perm, 0);
-                addPotionSafe(p, new String[]{"SPEED"}, perm, 0);
+                addPotionSafeByNames(p, new String[]{"INCREASE_DAMAGE","STRENGTH"}, perm, 0);
+                addPotionSafeByNames(p, new String[]{"SPEED"}, perm, 0);
                 break;
             case "cat":
-                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, perm, 1);
-                addPotionSafe(p, new String[]{"NIGHT_VISION","NIGHT_VISION"}, perm, 0);
+                addPotionSafeByNames(p, new String[]{"JUMP_BOOST","JUMP"}, perm, 1);
+                addPotionSafeByNames(p, new String[]{"NIGHT_VISION"}, perm, 0);
                 break;
             case "bee":
-                addPotionSafe(p, new String[]{"SLOW_FALLING","SLOW_FALLING"}, perm, 0);
-                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, perm, 1);
+                addPotionSafeByNames(p, new String[]{"SLOW_FALLING"}, perm, 0);
+                addPotionSafeByNames(p, new String[]{"JUMP_BOOST","JUMP"}, perm, 1);
                 break;
             case "fox":
-                addPotionSafe(p, new String[]{"SPEED"}, perm, 1);
-                scheduleFoxVisibility(p);
+                addPotionSafeByNames(p, new String[]{"SPEED"}, perm, 1);
+                scheduleFoxInvisibility(p);
                 break;
             case "turtle":
-                addPotionSafe(p, new String[]{"WATER_BREATHING"}, perm, 0);
-                addPotionSafe(p, new String[]{"DAMAGE_RESISTANCE","RESISTANCE"}, perm, 0);
+                addPotionSafeByNames(p, new String[]{"WATER_BREATHING"}, perm, 0);
+                addPotionSafeByNames(p, new String[]{"DAMAGE_RESISTANCE","RESISTANCE"}, perm, 0);
                 break;
             case "horse":
-                addPotionSafe(p, new String[]{"SPEED"}, perm, 0);
-                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, perm, 0);
+                addPotionSafeByNames(p, new String[]{"SPEED"}, perm, 0);
+                addPotionSafeByNames(p, new String[]{"JUMP_BOOST","JUMP"}, perm, 0);
                 break;
             case "sheep":
-                addPotionSafe(p, new String[]{"DAMAGE_RESISTANCE","RESISTANCE"}, perm, 0);
-                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, perm, 0);
+                addPotionSafeByNames(p, new String[]{"DAMAGE_RESISTANCE","RESISTANCE"}, perm, 0);
+                addPotionSafeByNames(p, new String[]{"JUMP_BOOST","JUMP"}, perm, 0);
                 break;
             case "ant":
-                addPotionSafe(p, new String[]{"FAST_DIGGING","HASTE"}, perm, 0);
-                addPotionSafe(p, new String[]{"INCREASE_DAMAGE","STRENGTH"}, perm, 0);
+                addPotionSafeByNames(p, new String[]{"FAST_DIGGING","HASTE"}, perm, 0);
+                addPotionSafeByNames(p, new String[]{"INCREASE_DAMAGE","STRENGTH"}, perm, 0);
                 break;
         }
     }
 
-    private void scheduleFoxVisibility(Player p) {
+    private void scheduleFoxInvisibility(Player p) {
         new BukkitRunnable() {
             @Override
             public void run() {
                 if (!p.isOnline()) { cancel(); return; }
                 long time = p.getWorld().getTime();
                 boolean night = time >= 13000 || time <= 2300;
-                if (night) addPotionSafe(p, new String[]{"INVISIBILITY"}, Integer.MAX_VALUE - 1000, 0);
+                if (night) addPotionSafeByNames(p, new String[]{"INVISIBILITY"}, Integer.MAX_VALUE - 1000, 0);
                 else p.removePotionEffect(PotionEffectType.INVISIBILITY);
                 cancel();
             }
@@ -326,7 +323,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
             return;
         }
 
-        // apply ability - each ability uses safe lookup helpers for potion/particle
+        // apply ability safely
         runAbilitySafe(abilityCmd, p, meta.durationSec);
 
         // set cooldown
@@ -335,72 +332,63 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
 
     private void runAbilitySafe(String cmd, Player p, int durationSeconds) {
         Location loc = p.getLocation().clone();
-
         switch (cmd) {
             case "pounce":
-                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, durationSeconds * 20, 0);
-                addPotionSafe(p, new String[]{"INCREASE_DAMAGE","STRENGTH"}, durationSeconds * 20, 1);
+                addPotionSafeByNames(p, new String[]{"JUMP_BOOST","JUMP"}, durationSeconds * 20, 0);
+                addPotionSafeByNames(p, new String[]{"INCREASE_DAMAGE","STRENGTH"}, durationSeconds * 20, 1);
                 spawnParticlesForSecondsSafe(p, new String[]{"SMOKE_LARGE","SMOKE"}, 5);
-                playSafeSound(p, Sound.ENTITY_WOLF_GROWL);
+                playSoundSafe(p, Sound.ENTITY_WOLF_GROWL);
                 p.sendMessage(ChatColor.GREEN + "Pounce activated!");
                 break;
-
             case "focus":
-                addPotionSafe(p, new String[]{"FAST_DIGGING","HASTE"}, durationSeconds * 20, 0);
-                addPotionSafe(p, new String[]{"SPEED"}, durationSeconds * 20, 1);
-                spawnParticlesForSecondsSafe(p, new String[]{"EXPLOSION_NORMAL","CLOUD"}, 5);
-                playSafeSound(p, Sound.ENTITY_CAT_PURR);
+                addPotionSafeByNames(p, new String[]{"FAST_DIGGING","HASTE"}, durationSeconds * 20, 0);
+                addPotionSafeByNames(p, new String[]{"SPEED"}, durationSeconds * 20, 1);
+                spawnParticlesForSecondsSafe(p, new String[]{"EXPLOSION_NORMAL","CLOUD","EXPERIENCE_ORB"}, 5);
+                playSoundSafe(p, Sound.ENTITY_CAT_PURR);
                 p.sendMessage(ChatColor.GREEN + "Focus activated!");
                 break;
-
             case "hover":
-                addPotionSafe(p, new String[]{"LEVITATION"}, durationSeconds * 20, 0);
-                addPotionSafe(p, new String[]{"DAMAGE_RESISTANCE","RESISTANCE"}, durationSeconds * 20, 1);
-                spawnParticlesForSecondsSafe(p, new String[]{"CLOUD"}, 5);
-                playSafeSound(p, Sound.ENTITY_BEE_LOOP);
+                addPotionSafeByNames(p, new String[]{"LEVITATION"}, durationSeconds * 20, 0);
+                addPotionSafeByNames(p, new String[]{"DAMAGE_RESISTANCE","RESISTANCE"}, durationSeconds * 20, 1);
+                spawnParticlesForSecondsSafe(p, new String[]{"CLOUD","DRIP_WATER"}, 5);
+                playSoundSafe(p, Sound.ENTITY_BEE_LOOP);
                 p.sendMessage(ChatColor.GREEN + "Hover activated!");
                 break;
-
             case "escape":
-                addPotionSafe(p, new String[]{"SPEED"}, durationSeconds * 20, 2);
-                addPotionSafe(p, new String[]{"FAST_DIGGING","HASTE"}, durationSeconds * 20, 0);
+                addPotionSafeByNames(p, new String[]{"SPEED"}, durationSeconds * 20, 2);
+                addPotionSafeByNames(p, new String[]{"FAST_DIGGING","HASTE"}, durationSeconds * 20, 0);
                 spawnParticlesForSecondsSafe(p, new String[]{"FLAME"}, 5);
-                playSafeSound(p, Sound.ENTITY_FOX_SCREECH);
+                playSoundSafe(p, Sound.ENTITY_FOX_SCREECH);
                 p.sendMessage(ChatColor.GREEN + "Escape activated!");
                 break;
-
             case "harden":
-                addPotionSafe(p, new String[]{"DAMAGE_RESISTANCE","RESISTANCE"}, durationSeconds * 20, 2);
-                addPotionSafe(p, new String[]{"SLOW"}, durationSeconds * 20, 1);
+                addPotionSafeByNames(p, new String[]{"DAMAGE_RESISTANCE","RESISTANCE"}, durationSeconds * 20, 2);
+                addPotionSafeByNames(p, new String[]{"SLOW"}, durationSeconds * 20, 1);
                 spawnParticlesForSecondsSafe(p, new String[]{"WATER_SPLASH"}, 5);
-                playSafeSound(p, Sound.ITEM_SHIELD_BLOCK);
+                playSoundSafe(p, Sound.ITEM_SHIELD_BLOCK);
                 p.sendMessage(ChatColor.GREEN + "Harden activated!");
                 break;
-
             case "gallop":
-                addPotionSafe(p, new String[]{"SPEED"}, durationSeconds * 20, 1);
-                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, durationSeconds * 20, 1);
+                addPotionSafeByNames(p, new String[]{"SPEED"}, durationSeconds * 20, 1);
+                addPotionSafeByNames(p, new String[]{"JUMP_BOOST","JUMP"}, durationSeconds * 20, 1);
                 spawnParticlesForSecondsSafe(p, new String[]{"SMOKE_LARGE","SMOKE"}, 5);
-                playSafeSound(p, Sound.ENTITY_HORSE_GALLOP);
+                playSoundSafe(p, Sound.ENTITY_HORSE_GALLOP);
                 p.sendMessage(ChatColor.GREEN + "Gallop activated!");
                 break;
-
             case "soften":
-                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, durationSeconds * 20, 1);
-                addPotionSafe(p, new String[]{"REGENERATION"}, durationSeconds * 20, 0);
+                addPotionSafeByNames(p, new String[]{"JUMP_BOOST","JUMP"}, durationSeconds * 20, 1);
+                addPotionSafeByNames(p, new String[]{"REGENERATION"}, durationSeconds * 20, 0);
                 spawnParticlesForSecondsSafe(p, new String[]{"VILLAGER_HAPPY","HEART"}, 5);
-                playSafeSound(p, Sound.ENTITY_SHEEP_AMBIENT);
+                playSoundSafe(p, Sound.ENTITY_SHEEP_AMBIENT);
                 p.sendMessage(ChatColor.GREEN + "Soften activated!");
                 break;
-
             case "sting":
-                addPotionSafe(p, new String[]{"INCREASE_DAMAGE","STRENGTH"}, durationSeconds * 20, 1);
-                addPotionSafe(p, new String[]{"SPEED"}, durationSeconds * 20, 0);
+                addPotionSafeByNames(p, new String[]{"INCREASE_DAMAGE","STRENGTH"}, durationSeconds * 20, 1);
+                addPotionSafeByNames(p, new String[]{"SPEED"}, durationSeconds * 20, 0);
                 spawnParticlesForSecondsSafe(p, new String[]{"SOUL","SMOKE"}, 5);
-                playSafeSound(p, Sound.ENTITY_BEE_STING);
+                playSoundSafe(p, Sound.ENTITY_BEE_STING);
                 p.sendMessage(ChatColor.GREEN + "Sting activated!");
                 break;
-
             default:
                 p.sendMessage(ChatColor.RED + "Unknown ability.");
                 break;
@@ -409,18 +397,8 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
 
     // ---------------- safe helpers ----------------
 
-    // Try multiple names for potion effect type and add if found
-    private void addPotionSafe(Player p, String[] names, int durationTicks, int amp) {
-        PotionEffectType type = lookupPotion(names);
-        if (type != null) p.addPotionEffect(new PotionEffect(type, durationTicks, amp, true, false));
-    }
-
-    // Try multiple names for potion effect type and add if found (duration seconds style)
-    private void addPotionSafe(Player p, String[] names, int durationSeconds, int amp) {
-        addPotionSafe(p, names, durationSeconds, amp);
-    }
-
-    private PotionEffectType lookupPotion(String[] names) {
+    // Attempt several name variants to find a matching PotionEffectType
+    private PotionEffectType lookupPotionType(String[] names) {
         for (String n : names) {
             if (n == null) continue;
             try {
@@ -428,8 +406,8 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
                 if (t != null) return t;
             } catch (Throwable ignored) {}
         }
-        // some servers might register lowercase aliases; attempt direct valueOf
         for (String n : names) {
+            if (n == null) continue;
             try {
                 return PotionEffectType.valueOf(n.toUpperCase(Locale.ROOT));
             } catch (Throwable ignored) {}
@@ -437,22 +415,23 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         return null;
     }
 
-    // Spawn a particle once by name (safe)
-    private void spawnParticleOnce(Player p, String particleName, int count) {
-        Particle particle = lookupParticle(particleName);
-        Location loc = p.getLocation().clone().add(0, 1.0, 0);
-        if (particle != null) p.getWorld().spawnParticle(particle, loc, count, 0.4, 0.6, 0.4, 0.02);
+    private void addPotionSafeByNames(Player p, String[] names, int durationTicks, int amp) {
+        PotionEffectType type = lookupPotionType(names);
+        if (type != null) {
+            p.addPotionEffect(new PotionEffect(type, durationTicks, amp, true, false));
+        }
     }
 
-    // Spawn repeated particles safely for seconds
-    private void spawnParticlesForSecondsSafe(Player p, String[] candidates, int seconds) {
-        Particle particle = null;
-        for (String s : candidates) {
-            particle = lookupParticle(s);
-            if (particle != null) break;
-        }
-        if (particle == null) particle = Particle.CLOUD; // fallback
+    private void spawnParticleOnceSafe(Player p, String[] candidateNames, int count) {
+        Particle particle = lookupParticle(candidateNames);
+        if (particle == null) particle = Particle.CLOUD;
+        Location loc = p.getLocation().clone().add(0, 1.0, 0);
+        p.getWorld().spawnParticle(particle, loc, count, 0.4, 0.6, 0.4, 0.02);
+    }
 
+    private void spawnParticlesForSecondsSafe(Player p, String[] candidates, int seconds) {
+        Particle particle = lookupParticle(candidates);
+        if (particle == null) particle = Particle.CLOUD;
         final Particle finalParticle = particle;
         new BukkitRunnable() {
             int ticks = 0;
@@ -467,13 +446,25 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         }.runTaskTimer(this, 0L, 5L);
     }
 
-    private Particle lookupParticle(String name) {
-        if (name == null) return null;
+    private Particle lookupParticle(String[] names) {
+        if (names == null) return null;
+        for (String n : names) {
+            if (n == null) continue;
+            try {
+                return Particle.valueOf(n.toUpperCase(Locale.ROOT));
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
+    private void playSoundSafe(Player p, Sound s) {
         try {
-            return Particle.valueOf(name.toUpperCase(Locale.ROOT));
+            p.playSound(p.getLocation(), s, SoundCategory.PLAYERS, 1f, 1f);
         } catch (Throwable ignored) {}
-        // try some common fallbacks
-        try {
-            return Particle.valueOf(name.replaceAll(" ", "_").toUpperCase(Locale.ROOT));
-        } catch (Throwable ignored) {}
-        return
+    }
+
+    // ---------------- utilities ----------------
+
+    private static String capitalize(String s) {
+        if (s == null || s.isEmpty()) return s;
+        return Character.toUpperCase(s.charAt(0)) + 
