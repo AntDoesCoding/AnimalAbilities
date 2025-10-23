@@ -12,18 +12,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java 17
+      - name: Set up Java
         uses: actions/setup-java@v4
         with:
-          distribution: temurin
-          java-version: 17
-
-      - name: Verify pom.xml exists
-        run: |
-          if [ ! -f pom.xml ]; then
-            echo "❌ pom.xml not found in root directory!"
-            exit 1
-          fi
+          distribution: 'temurin'
+          java-version: '17'
+          cache: 'maven'
 
       - name: Build with Maven
         run: mvn -B package --file pom.xml
