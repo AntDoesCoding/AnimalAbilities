@@ -27,14 +27,14 @@ import org.bukkit.scheduler.BukkitRunnable;
 import java.util.*;
 
 /**
- * AnimalAbilities - final version
+ * Patched AnimalAbilities - runtime-safe enum lookups to avoid missing-constant compile errors.
  */
 public class AnimalAbilities extends JavaPlugin implements Listener {
 
-    // player uuid -> chosen animal (wolf,cat,bee,fox,turtle,horse,sheep,ant)
+    // player uuid -> chosen animal
     private final Map<UUID, String> chosen = new HashMap<>();
 
-    // player uuid -> (ability -> expiryMillis)
+    // player uuid -> ability -> expiryMillis
     private final Map<UUID, Map<String, Long>> cooldowns = new HashMap<>();
 
     private final Map<String, AbilityMeta> abilityMeta = new HashMap<>();
@@ -52,21 +52,21 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
+        // init meta
+        abilityMeta.put("pounce", new AbilityMeta("wolf", 6 * 60, 8));
+        abilityMeta.put("focus", new AbilityMeta("cat", 7 * 60, 10));
+        abilityMeta.put("hover", new AbilityMeta("bee", 4 * 60, 6));
+        abilityMeta.put("escape", new AbilityMeta("fox", 10 * 60, 10));
+        abilityMeta.put("harden", new AbilityMeta("turtle", 8 * 60, 6));
+        abilityMeta.put("gallop", new AbilityMeta("horse", 10 * 60, 8));
+        abilityMeta.put("soften", new AbilityMeta("sheep", 8 * 60, 8));
+        abilityMeta.put("sting", new AbilityMeta("ant", 5 * 60, 6));
+
         // load saved choices
         loadChoices();
 
-        // register events and commands via plugin.yml
+        // register
         getServer().getPluginManager().registerEvents(this, this);
-
-        // init abilities meta (cooldowns in seconds, duration of effects in seconds)
-        abilityMeta.put("pounce", new AbilityMeta("wolf", 6 * 60, 8));       // Wolf: Jump I + Strength II
-        abilityMeta.put("focus", new AbilityMeta("cat", 7 * 60, 10));       // Cat: Haste + Speed II
-        abilityMeta.put("hover", new AbilityMeta("bee", 4 * 60, 6));        // Bee: Levitation + Resistance II
-        abilityMeta.put("escape", new AbilityMeta("fox", 10 * 60, 10));     // Fox: Speed III + Haste
-        abilityMeta.put("harden", new AbilityMeta("turtle", 8 * 60, 6));    // Turtle: Resistance III + Slowness II
-        abilityMeta.put("gallop", new AbilityMeta("horse", 10 * 60, 8));    // Horse: Speed II + Jump II
-        abilityMeta.put("soften", new AbilityMeta("sheep", 8 * 60, 8));     // Sheep: Jump II + Regeneration I
-        abilityMeta.put("sting", new AbilityMeta("ant", 5 * 60, 6));        // Ant: Strength II + Speed I
 
         getLogger().info("AnimalAbilities enabled.");
     }
@@ -77,7 +77,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         getLogger().info("AnimalAbilities disabled.");
     }
 
-    // ------------------ persistence ------------------
+    // ---------------- persistence ----------------
 
     private void loadChoices() {
         FileConfiguration cfg = getConfig();
@@ -89,7 +89,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
                 if (!animal.isEmpty()) chosen.put(u, animal.toLowerCase(Locale.ROOT));
             } catch (Exception ignored) {}
         }
-        getLogger().info("Loaded " + chosen.size() + " player choices.");
+        getLogger().info("Loaded " + chosen.size() + " saved choices.");
     }
 
     private void saveChoices() {
@@ -101,7 +101,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         saveConfig();
     }
 
-    // ------------------ commands ------------------
+    // ---------------- commands ----------------
 
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
@@ -109,7 +109,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
 
         if (cmd.equals("chooseanimal")) {
             if (!(sender instanceof Player p)) {
-                sender.sendMessage("Only players can choose animals.");
+                sender.sendMessage("Only players can use this command.");
                 return true;
             }
             openChooseGui(p);
@@ -121,8 +121,9 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
                 sender.sendMessage(ChatColor.RED + "Usage: /resetanimal <player>");
                 return true;
             }
+            // console allowed; in-game require OP
             if (sender instanceof Player sp && !sp.isOp()) {
-                sender.sendMessage(ChatColor.RED + "Only OPs can run this command.");
+                sender.sendMessage(ChatColor.RED + "Only OPs may run this.");
                 return true;
             }
             Player target = Bukkit.getPlayerExact(args[0]);
@@ -138,7 +139,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
             return true;
         }
 
-        // ability commands (use plugin.yml to define them)
+        // ability commands (defined in plugin.yml)
         if (abilityMeta.containsKey(cmd)) {
             if (!(sender instanceof Player p)) {
                 sender.sendMessage("Only players can use abilities.");
@@ -151,34 +152,48 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         return false;
     }
 
-    // ------------------ GUI ------------------
+    // ---------------- GUI ----------------
 
     private void openChooseGui(Player p) {
         if (chosen.containsKey(p.getUniqueId())) {
             p.sendMessage(ChatColor.RED + "You already chose an animal. Ask an OP to reset.");
             return;
         }
-        Inventory gui = Bukkit.createInventory(null, 9, ChatColor.DARK_GREEN + "Choose Your Animal");
+        Inventory inv = Bukkit.createInventory(null, 9, ChatColor.DARK_GREEN + "Choose Your Animal");
 
-        gui.setItem(0, createItem(Material.BONE, "Wolf", "Strong and Brave!", "Strength I, Speed I"));
-        gui.setItem(1, createItem(Material.STRING, "Cat", "Agile and Alert!", "Jump Boost II, Night Vision"));
-        gui.setItem(2, createItem(Material.HONEYCOMB, "Bee", "Graceful in the air!", "Slow Falling, Jump Boost II"));
-        gui.setItem(3, createItem(Material.SWEET_BERRIES, "Fox", "Sneaky and Swift!", "Speed II, Invisibility at night"));
-        gui.setItem(4, createItem(Material.SCUTE, "Turtle", "Calm and tough!", "Water Breathing, Resistance I"));
-        gui.setItem(5, createItem(Material.SADDLE, "Horse", "Fast and powerful!", "Speed I, Jump Boost I"));
-        gui.setItem(6, createItem(Material.WHITE_WOOL, "Sheep", "Soft yet resilient!", "Resistance I, Jump Boost I"));
-        gui.setItem(7, createItem(Material.ANVIL, "Ant", "Tiny but mighty!", "Haste, Strength I"));
+        inv.setItem(0, createGuiItem("BONE", "Wolf", "Strong and Brave!", "Strength I, Speed I"));
+        inv.setItem(1, createGuiItem("STRING", "Cat", "Agile and Alert!", "Jump Boost II, Night Vision"));
+        inv.setItem(2, createGuiItem("HONEYCOMB", "Bee", "Graceful in the air!", "Slow Falling, Jump Boost II"));
+        inv.setItem(3, createGuiItem("SWEET_BERRIES", "Fox", "Sneaky and Swift!", "Speed II, Invisibility at night"));
+        inv.setItem(4, createGuiItem("SCUTE", "Turtle", "Calm and tough!", "Water Breathing, Resistance I"));
+        inv.setItem(5, createGuiItem("SADDLE", "Horse", "Fast and powerful!", "Speed I, Jump Boost I"));
+        inv.setItem(6, createGuiItem("WHITE_WOOL", "Sheep", "Soft yet resilient!", "Resistance I, Jump Boost I"));
+        inv.setItem(7, createGuiItem("ANVIL", "Ant", "Tiny but mighty!", "Haste, Strength I"));
 
-        p.openInventory(gui);
+        p.openInventory(inv);
     }
 
-    private ItemStack createItem(Material mat, String name, String desc, String effects) {
+    private ItemStack createGuiItem(String materialName, String displayName, String desc, String effects) {
+        Material mat = matchMaterialFallback(materialName);
         ItemStack it = new ItemStack(mat);
         ItemMeta meta = it.getItemMeta();
-        meta.setDisplayName(ChatColor.GOLD + name);
-        meta.setLore(Arrays.asList(ChatColor.WHITE + desc, ChatColor.GREEN + effects));
-        it.setItemMeta(meta);
+        if (meta != null) {
+            meta.setDisplayName(ChatColor.GOLD + displayName);
+            meta.setLore(Arrays.asList(ChatColor.WHITE + desc, ChatColor.GREEN + effects));
+            it.setItemMeta(meta);
+        }
         return it;
+    }
+
+    private Material matchMaterialFallback(String name) {
+        Material m = Material.matchMaterial(name);
+        if (m != null) return m;
+        try {
+            return Material.valueOf(name);
+        } catch (Exception ex) {
+            // ultimate fallback
+            return Material.BARRIER;
+        }
     }
 
     @EventHandler
@@ -191,23 +206,24 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
             p.closeInventory();
             return;
         }
-        String name = ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
+        String display = ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
         Set<String> allowed = Set.of("wolf","cat","bee","fox","turtle","horse","sheep","ant");
-        if (!allowed.contains(name)) {
+        if (!allowed.contains(display)) {
             p.sendMessage(ChatColor.RED + "Invalid selection.");
             p.closeInventory();
             return;
         }
-        chosen.put(p.getUniqueId(), name);
+        chosen.put(p.getUniqueId(), display);
         saveChoices();
-        p.sendMessage(ChatColor.GREEN + "You are now bonded with the " + ChatColor.AQUA + capitalize(name) + ChatColor.GREEN + "!");
+        p.sendMessage(ChatColor.GREEN + "You are now bonded with the " + ChatColor.AQUA + capitalize(display) + ChatColor.GREEN + "!");
         applyPassive(p);
-        p.getWorld().spawnParticle(Particle.VILLAGER_HAPPY, p.getLocation().add(0,1,0), 20, 0.4,0.6,0.4, 0.02);
+        // spawn a safe particle (try to use VILLAGER_HAPPY; fallback handled)
+        spawnParticleOnce(p, "VILLAGER_HAPPY", 20);
         p.playSound(p.getLocation(), Sound.ENTITY_PLAYER_LEVELUP, SoundCategory.PLAYERS, 1f, 1f);
         p.closeInventory();
     }
 
-    // ------------------ passives & reapply ------------------
+    // ---------------- passives & reapply ----------------
 
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
@@ -224,59 +240,55 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
     }
 
     private void applyPassive(Player p) {
-        // clear current potion effects to avoid stacking
         clearAllEffects(p);
-
-        String animal = chosen.get(p.getUniqueId());
-        if (animal == null) return;
-
+        String a = chosen.get(p.getUniqueId());
+        if (a == null) return;
         int perm = Integer.MAX_VALUE - 1000;
 
-        switch (animal) {
+        switch (a) {
             case "wolf":
-                p.addPotionEffect(new PotionEffect(PotionEffectType.INCREASE_DAMAGE, perm, 0)); // Strength I
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, perm, 0));
+                addPotionSafe(p, new String[]{"INCREASE_DAMAGE","STRENGTH"}, perm, 0);
+                addPotionSafe(p, new String[]{"SPEED"}, perm, 0);
                 break;
             case "cat":
-                p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, perm, 1)); // Jump II
-                p.addPotionEffect(new PotionEffect(PotionEffectType.NIGHT_VISION, perm, 0));
+                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, perm, 1);
+                addPotionSafe(p, new String[]{"NIGHT_VISION","NIGHT_VISION"}, perm, 0);
                 break;
             case "bee":
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SLOW_FALLING, perm, 0));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, perm, 1));
+                addPotionSafe(p, new String[]{"SLOW_FALLING","SLOW_FALLING"}, perm, 0);
+                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, perm, 1);
                 break;
             case "fox":
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, perm, 1)); // Speed II
-                // invis at night only - simple check now
-                scheduleFoxInvisibilityCheck(p);
+                addPotionSafe(p, new String[]{"SPEED"}, perm, 1);
+                scheduleFoxVisibility(p);
                 break;
             case "turtle":
-                p.addPotionEffect(new PotionEffect(PotionEffectType.WATER_BREATHING, perm, 0));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, perm, 0));
+                addPotionSafe(p, new String[]{"WATER_BREATHING"}, perm, 0);
+                addPotionSafe(p, new String[]{"DAMAGE_RESISTANCE","RESISTANCE"}, perm, 0);
                 break;
             case "horse":
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, perm, 0));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, perm, 0));
+                addPotionSafe(p, new String[]{"SPEED"}, perm, 0);
+                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, perm, 0);
                 break;
             case "sheep":
-                p.addPotionEffect(new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, perm, 0));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, perm, 0));
+                addPotionSafe(p, new String[]{"DAMAGE_RESISTANCE","RESISTANCE"}, perm, 0);
+                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, perm, 0);
                 break;
             case "ant":
-                p.addPotionEffect(new PotionEffect(PotionEffectType.FAST_DIGGING, perm, 0)); // Haste I
-                p.addPotionEffect(new PotionEffect(PotionEffectType.INCREASE_DAMAGE, perm, 0)); // Strength I
+                addPotionSafe(p, new String[]{"FAST_DIGGING","HASTE"}, perm, 0);
+                addPotionSafe(p, new String[]{"INCREASE_DAMAGE","STRENGTH"}, perm, 0);
                 break;
         }
     }
 
-    private void scheduleFoxInvisibilityCheck(Player p) {
+    private void scheduleFoxVisibility(Player p) {
         new BukkitRunnable() {
             @Override
             public void run() {
                 if (!p.isOnline()) { cancel(); return; }
                 long time = p.getWorld().getTime();
                 boolean night = time >= 13000 || time <= 2300;
-                if (night) p.addPotionEffect(new PotionEffect(PotionEffectType.INVISIBILITY, Integer.MAX_VALUE - 1000, 0));
+                if (night) addPotionSafe(p, new String[]{"INVISIBILITY"}, Integer.MAX_VALUE - 1000, 0);
                 else p.removePotionEffect(PotionEffectType.INVISIBILITY);
                 cancel();
             }
@@ -289,7 +301,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         }
     }
 
-    // ------------------ ability handling ------------------
+    // ---------------- ability handling ----------------
 
     private void handleAbility(Player p, String abilityCmd) {
         AbilityMeta meta = abilityMeta.get(abilityCmd);
@@ -307,84 +319,85 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
 
         Map<String, Long> userCd = cooldowns.computeIfAbsent(p.getUniqueId(), k -> new HashMap<>());
         long now = System.currentTimeMillis();
-        long until = userCd.getOrDefault(abilityCmd, 0L);
-        if (now < until) {
-            long left = (until - now) / 1000;
+        long expiry = userCd.getOrDefault(abilityCmd, 0L);
+        if (now < expiry) {
+            long left = (expiry - now) / 1000;
             p.sendMessage(ChatColor.YELLOW + "Ability on cooldown: " + left + "s");
             return;
         }
 
-        // Apply ability effects, particles, sound
-        runAbility(abilityCmd, p, meta.durationSec);
+        // apply ability - each ability uses safe lookup helpers for potion/particle
+        runAbilitySafe(abilityCmd, p, meta.durationSec);
 
         // set cooldown
         userCd.put(abilityCmd, now + meta.cooldownSec * 1000L);
     }
 
-    private void runAbility(String abilityCmd, Player p, int durationSeconds) {
+    private void runAbilitySafe(String cmd, Player p, int durationSeconds) {
         Location loc = p.getLocation().clone();
-        switch (abilityCmd) {
-            case "pounce": // Wolf: Jump I, Strength II
-                p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, durationSeconds * 20, 0));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.INCREASE_DAMAGE, durationSeconds * 20, 1));
-                spawnParticlesTimed(p, Particle.SMOKE_LARGE, 5);
-                p.playSound(loc, Sound.ENTITY_WOLF_GROWL, SoundCategory.PLAYERS, 1f, 1f);
+
+        switch (cmd) {
+            case "pounce":
+                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, durationSeconds * 20, 0);
+                addPotionSafe(p, new String[]{"INCREASE_DAMAGE","STRENGTH"}, durationSeconds * 20, 1);
+                spawnParticlesForSecondsSafe(p, new String[]{"SMOKE_LARGE","SMOKE"}, 5);
+                playSafeSound(p, Sound.ENTITY_WOLF_GROWL);
                 p.sendMessage(ChatColor.GREEN + "Pounce activated!");
                 break;
 
-            case "focus": // Cat: Haste, Speed II
-                p.addPotionEffect(new PotionEffect(PotionEffectType.FAST_DIGGING, durationSeconds * 20, 0));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, durationSeconds * 20, 1));
-                spawnParticlesTimed(p, Particle.EXPLOSION_NORMAL, 5);
-                p.playSound(loc, Sound.ENTITY_CAT_PURR, SoundCategory.PLAYERS, 1f, 1f);
+            case "focus":
+                addPotionSafe(p, new String[]{"FAST_DIGGING","HASTE"}, durationSeconds * 20, 0);
+                addPotionSafe(p, new String[]{"SPEED"}, durationSeconds * 20, 1);
+                spawnParticlesForSecondsSafe(p, new String[]{"EXPLOSION_NORMAL","CLOUD"}, 5);
+                playSafeSound(p, Sound.ENTITY_CAT_PURR);
                 p.sendMessage(ChatColor.GREEN + "Focus activated!");
                 break;
 
-            case "hover": // Bee: Levitation, Resistance II
-                p.addPotionEffect(new PotionEffect(PotionEffectType.LEVITATION, durationSeconds * 20, 0));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, durationSeconds * 20, 1));
-                spawnParticlesTimed(p, Particle.CLOUD, 5);
-                p.playSound(loc, Sound.ENTITY_BEE_LOOP, SoundCategory.PLAYERS, 1f, 1f);
+            case "hover":
+                addPotionSafe(p, new String[]{"LEVITATION"}, durationSeconds * 20, 0);
+                addPotionSafe(p, new String[]{"DAMAGE_RESISTANCE","RESISTANCE"}, durationSeconds * 20, 1);
+                spawnParticlesForSecondsSafe(p, new String[]{"CLOUD"}, 5);
+                playSafeSound(p, Sound.ENTITY_BEE_LOOP);
                 p.sendMessage(ChatColor.GREEN + "Hover activated!");
                 break;
 
-            case "escape": // Fox: Speed III, Haste
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, durationSeconds * 20, 2));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.FAST_DIGGING, durationSeconds * 20, 0));
-                spawnParticlesTimed(p, Particle.FLAME, 5);
-                p.playSound(loc, Sound.ENTITY_FOX_SCREECH, SoundCategory.PLAYERS, 1f, 1f);
+            case "escape":
+                addPotionSafe(p, new String[]{"SPEED"}, durationSeconds * 20, 2);
+                addPotionSafe(p, new String[]{"FAST_DIGGING","HASTE"}, durationSeconds * 20, 0);
+                spawnParticlesForSecondsSafe(p, new String[]{"FLAME"}, 5);
+                playSafeSound(p, Sound.ENTITY_FOX_SCREECH);
                 p.sendMessage(ChatColor.GREEN + "Escape activated!");
                 break;
 
-            case "harden": // Turtle: Resistance III, Slowness II
-                p.addPotionEffect(new PotionEffect(PotionEffectType.DAMAGE_RESISTANCE, durationSeconds * 20, 2));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SLOW, durationSeconds * 20, 1));
-                spawnParticlesTimed(p, Particle.WATER_SPLASH, 5);
-                p.playSound(loc, Sound.ITEM_SHIELD_BLOCK, SoundCategory.PLAYERS, 1f, 1f);
+            case "harden":
+                addPotionSafe(p, new String[]{"DAMAGE_RESISTANCE","RESISTANCE"}, durationSeconds * 20, 2);
+                addPotionSafe(p, new String[]{"SLOW"}, durationSeconds * 20, 1);
+                spawnParticlesForSecondsSafe(p, new String[]{"WATER_SPLASH"}, 5);
+                playSafeSound(p, Sound.ITEM_SHIELD_BLOCK);
                 p.sendMessage(ChatColor.GREEN + "Harden activated!");
                 break;
 
-            case "gallop": // Horse: Speed II, Jump II
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, durationSeconds * 20, 1));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, durationSeconds * 20, 1));
-                spawnParticlesTimed(p, Particle.SMOKE_LARGE, 5);
-                p.playSound(loc, Sound.ENTITY_HORSE_GALLOP, SoundCategory.PLAYERS, 1f, 1f);
+            case "gallop":
+                addPotionSafe(p, new String[]{"SPEED"}, durationSeconds * 20, 1);
+                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, durationSeconds * 20, 1);
+                spawnParticlesForSecondsSafe(p, new String[]{"SMOKE_LARGE","SMOKE"}, 5);
+                playSafeSound(p, Sound.ENTITY_HORSE_GALLOP);
                 p.sendMessage(ChatColor.GREEN + "Gallop activated!");
                 break;
 
-            case "soften": // Sheep: Jump II, Regeneration I
-                p.addPotionEffect(new PotionEffect(PotionEffectType.JUMP_BOOST, durationSeconds * 20, 1));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.REGENERATION, durationSeconds * 20, 0));
-                spawnParticlesTimed(p, Particle.VILLAGER_HAPPY, 5);
-                p.playSound(loc, Sound.ENTITY_SHEEP_AMBIENT, SoundCategory.PLAYERS, 1f, 1f);
+            case "soften":
+                addPotionSafe(p, new String[]{"JUMP_BOOST","JUMP"}, durationSeconds * 20, 1);
+                addPotionSafe(p, new String[]{"REGENERATION"}, durationSeconds * 20, 0);
+                spawnParticlesForSecondsSafe(p, new String[]{"VILLAGER_HAPPY","HEART"}, 5);
+                playSafeSound(p, Sound.ENTITY_SHEEP_AMBIENT);
                 p.sendMessage(ChatColor.GREEN + "Soften activated!");
                 break;
 
-            case "sting": // Ant: Strength II, Speed I
-                p.addPotionEffect(new PotionEffect(PotionEffectType.INCREASE_DAMAGE, durationSeconds * 20, 1));
-                p.addPotionEffect(new PotionEffect(PotionEffectType.SPEED, durationSeconds * 20, 0));
-                spawnParticlesTimed(p, Particle.SOUL, 5);
-                p.playSound(loc, Sound.ENTITY_BEE_STING, SoundCategory.PLAYERS, 1f, 1f);
+            case "sting":
+                addPotionSafe(p, new String[]{"INCREASE_DAMAGE","STRENGTH"}, durationSeconds * 20, 1);
+                addPotionSafe(p, new String[]{"SPEED"}, durationSeconds * 20, 0);
+                spawnParticlesForSecondsSafe(p, new String[]{"SOUL","SMOKE"}, 5);
+                playSafeSound(p, Sound.ENTITY_BEE_STING);
                 p.sendMessage(ChatColor.GREEN + "Sting activated!");
                 break;
 
@@ -394,28 +407,73 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         }
     }
 
-    /**
-     * Spawns repeated particle bursts around the player for 'seconds' seconds.
-     */
-    private void spawnParticlesTimed(Player p, Particle particle, int seconds) {
+    // ---------------- safe helpers ----------------
+
+    // Try multiple names for potion effect type and add if found
+    private void addPotionSafe(Player p, String[] names, int durationTicks, int amp) {
+        PotionEffectType type = lookupPotion(names);
+        if (type != null) p.addPotionEffect(new PotionEffect(type, durationTicks, amp, true, false));
+    }
+
+    // Try multiple names for potion effect type and add if found (duration seconds style)
+    private void addPotionSafe(Player p, String[] names, int durationSeconds, int amp) {
+        addPotionSafe(p, names, durationSeconds, amp);
+    }
+
+    private PotionEffectType lookupPotion(String[] names) {
+        for (String n : names) {
+            if (n == null) continue;
+            try {
+                PotionEffectType t = PotionEffectType.getByName(n.toUpperCase(Locale.ROOT));
+                if (t != null) return t;
+            } catch (Throwable ignored) {}
+        }
+        // some servers might register lowercase aliases; attempt direct valueOf
+        for (String n : names) {
+            try {
+                return PotionEffectType.valueOf(n.toUpperCase(Locale.ROOT));
+            } catch (Throwable ignored) {}
+        }
+        return null;
+    }
+
+    // Spawn a particle once by name (safe)
+    private void spawnParticleOnce(Player p, String particleName, int count) {
+        Particle particle = lookupParticle(particleName);
+        Location loc = p.getLocation().clone().add(0, 1.0, 0);
+        if (particle != null) p.getWorld().spawnParticle(particle, loc, count, 0.4, 0.6, 0.4, 0.02);
+    }
+
+    // Spawn repeated particles safely for seconds
+    private void spawnParticlesForSecondsSafe(Player p, String[] candidates, int seconds) {
+        Particle particle = null;
+        for (String s : candidates) {
+            particle = lookupParticle(s);
+            if (particle != null) break;
+        }
+        if (particle == null) particle = Particle.CLOUD; // fallback
+
+        final Particle finalParticle = particle;
         new BukkitRunnable() {
             int ticks = 0;
-            final int interval = 5; // run every 5 ticks
             @Override
             public void run() {
                 if (!p.isOnline()) { cancel(); return; }
                 Location c = p.getLocation().clone().add(0, 1.0, 0);
-                p.getWorld().spawnParticle(particle, c, 40, 0.6, 0.6, 0.6, 0.02);
-                ticks += interval;
+                p.getWorld().spawnParticle(finalParticle, c, 40, 0.6, 0.6, 0.6, 0.02);
+                ticks += 5;
                 if (ticks >= seconds * 20) cancel();
             }
         }.runTaskTimer(this, 0L, 5L);
     }
 
-    // ------------------ utilities ------------------
-
-    private static String capitalize(String s) {
-        if (s == null || s.isEmpty()) return s;
-        return Character.toUpperCase(s.charAt(0)) + s.substring(1);
-    }
-                    }
+    private Particle lookupParticle(String name) {
+        if (name == null) return null;
+        try {
+            return Particle.valueOf(name.toUpperCase(Locale.ROOT));
+        } catch (Throwable ignored) {}
+        // try some common fallbacks
+        try {
+            return Particle.valueOf(name.replaceAll(" ", "_").toUpperCase(Locale.ROOT));
+        } catch (Throwable ignored) {}
+        return
