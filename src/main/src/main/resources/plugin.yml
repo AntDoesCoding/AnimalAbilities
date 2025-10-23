@@ -2,24 +2,66 @@ name: AnimalAbilities
 main: com.animalabilities.AnimalAbilities
 version: 1.0.0
 api-version: 1.21
+author: AntDoesCoding
+description: A plugin that allows players to choose an animal and gain passive abilities and powers.
+
 commands:
   chooseanimal:
-    description: Open the animal chooser GUI.
-  resetanimal:
-    description: Reset a player's chosen animal (OP/Console).
+    description: Opens the Animal selection GUI.
+    usage: /<command>
   pounce:
     description: Wolf ability.
+    usage: /<command>
   focus:
     description: Cat ability.
+    usage: /<command>
   hover:
     description: Bee ability.
+    usage: /<command>
   escape:
     description: Fox ability.
+    usage: /<command>
   harden:
     description: Turtle ability.
+    usage: /<command>
   gallop:
     description: Horse ability.
+    usage: /<command>
   soften:
     description: Sheep ability.
+    usage: /<command>
   sting:
     description: Ant ability.
+    usage: /<command>
+
+permissions:
+  animalabilities.use:
+    description: Allows player to use the AnimalAbilities plugin.
+    default: true
+  animalabilities.choose:
+    description: Allows player to choose their animal.
+    default: true
+  animalabilities.wolf:
+    description: Allows use of wolf ability.
+    default: true
+  animalabilities.cat:
+    description: Allows use of cat ability.
+    default: true
+  animalabilities.bee:
+    description: Allows use of bee ability.
+    default: true
+  animalabilities.fox:
+    description: Allows use of fox ability.
+    default: true
+  animalabilities.turtle:
+    description: Allows use of turtle ability.
+    default: true
+  animalabilities.horse:
+    description: Allows use of horse ability.
+    default: true
+  animalabilities.sheep:
+    description: Allows use of sheep ability.
+    default: true
+  animalabilities.ant:
+    description: Allows use of ant ability.
+    default: true
