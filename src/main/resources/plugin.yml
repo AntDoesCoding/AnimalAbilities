@@ -1,37 +1,22 @@
-# File: plugin.yml
 name: AnimalAbilities
 main: com.animalabilities.AnimalAbilities
 version: 1.0.0
-api-version: "1.21"
-author: You
+api-version: 1.21
+author: ChatGPT
+description: Adds animal abilities and passives with GUI selection and cooldowns
 commands:
   chooseanimal:
-    description: Open the animal selection GUI
+    description: Opens the animal selection menu
     usage: /chooseanimal
+    permission: animalabilities.use
   resetanimal:
-    description: Reset a player's animal (OP only for other players). Use @a to reset all.
+    description: Resets a player's chosen animal
     usage: /resetanimal <player|@a>
-  pounce:
-    description: Wolf ability
-  focus:
-    description: Cat ability
-  hover:
-    description: Bee ability
-  escape:
-    description: Fox ability
-  harden:
-    description: Turtle ability
-  gallop:
-    description: Horse ability
-  soften:
-    description: Sheep ability
-  sting:
-    description: Ant ability
-  glide:
-    description: Owl ability
-  discovery:
-    description: CopperGolem ability
+    permission: animalabilities.reset
 permissions:
+  animalabilities.use:
+    description: Allows players to choose and use an animal
+    default: true
   animalabilities.reset:
-    description: Allows resetting other players' animals
+    description: Allows resetting other players’ animals
     default: op
