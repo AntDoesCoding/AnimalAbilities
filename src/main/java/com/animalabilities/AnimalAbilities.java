@@ -29,15 +29,7 @@ import java.io.IOException;
 import java.util.*;
 
 /**
- * AnimalAbilities - Paper 1.21.x plugin (fixed, syntactically complete)
- *
- * This is the complete, compiled-ready Java source for the plugin's main class.
- * It contains:
- * - chooseanimal GUI
- * - persistence to data.yml
- * - passive application
- * - abilities with cooldowns, particles and sounds
- * - reset command for OPs / console
+ * AnimalAbilities - Paper 1.21.x plugin main class (fixed, syntactically complete)
  *
  * Drop into src/main/java/com/animalabilities/AnimalAbilities.java
  */
@@ -327,7 +319,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
                 durationSec = 10; cooldownSec = 22 * 60;
                 addPotionSafe(p, "JUMP_BOOST", durationSec * 20, 0);
                 addPotionSafe(p, "INCREASE_DAMAGE", durationSec * 20, 1);
-                spawnParticlesTimed(p, Particle.SMOKE_LARGE, 40, 5);
+                spawnParticlesTimed(p, Particle.SMOKE_NORMAL, 40, 5);
                 playSafeSound(p, Sound.ENTITY_WOLF_GROWL);
                 p.sendMessage(ChatColor.GREEN + "Pounce activated! Cooldown: " + (cooldownSec/60) + "m");
                 break;
@@ -458,4 +450,10 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
     private void addPotionSafe(Player p, String name, int ticks, int amp) {
         PotionEffectType t = resolvePotionType(name);
         if (t != null) {
-            try { p.addPo
+            try { p.addPotionEffect(new PotionEffect(t, ticks, amp, true, false)); } catch (Throwable ignored) {}
+        }
+    }
+
+    private PotionEffectType resolvePotionType(String name) {
+        if (name == null) return null;
+        String n = name.toUpperCase(Locale.ROO
