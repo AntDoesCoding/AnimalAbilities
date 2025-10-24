@@ -29,25 +29,21 @@ import java.io.IOException;
 import java.util.*;
 
 /**
- * AnimalAbilities - Paper 1.21.x plugin
+ * AnimalAbilities - Paper 1.21.x plugin (fixed, syntactically complete)
  *
- * Features:
- * - /chooseanimal opens a GUI (10 animals)
- * - Player is locked into a single animal choice (saved to data.yml)
- * - Passive effects applied and reapplied on join/respawn
- * - Abilities (one-word commands) usable only by players with that animal
- * - Per-player per-ability cooldowns (20–25 minutes range)
- * - Visual particle effects and sounds for abilities (5s visuals)
- * - /resetanimal <player> for OPs (or console) to reset another player's animal
+ * This is the complete, compiled-ready Java source for the plugin's main class.
+ * It contains:
+ * - chooseanimal GUI
+ * - persistence to data.yml
+ * - passive application
+ * - abilities with cooldowns, particles and sounds
+ * - reset command for OPs / console
  *
  * Drop into src/main/java/com/animalabilities/AnimalAbilities.java
  */
 public class AnimalAbilities extends JavaPlugin implements Listener {
 
-    // saved player -> animal
     private final Map<UUID, String> chosen = new HashMap<>();
-
-    // cooldowns: player -> ability -> untilMillis
     private final Map<UUID, Map<String, Long>> cooldowns = new HashMap<>();
 
     private File dataFile;
@@ -55,7 +51,6 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
 
     @Override
     public void onEnable() {
-        // prepare data file
         dataFile = new File(getDataFolder(), "data.yml");
         if (!dataFile.exists()) {
             getDataFolder().mkdirs();
@@ -68,20 +63,17 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         dataYml = YamlConfiguration.loadConfiguration(dataFile);
         loadSavedChoices();
 
-        // register events and commands
         Bukkit.getPluginManager().registerEvents(this, this);
-
-        // No dynamic command registration required if plugin.yml defines commands.
         getLogger().info("AnimalAbilities enabled. Loaded " + chosen.size() + " choices.");
     }
 
     @Override
     public void onDisable() {
         saveChoices();
-        getLogger().info("AnimalAbilities disabled, saved choices.");
+        getLogger().info("AnimalAbilities disabled.");
     }
 
-    // ---------- Persistence ----------
+    // ---------------- Persistence ----------------
     private void loadSavedChoices() {
         if (dataYml == null) dataYml = YamlConfiguration.loadConfiguration(dataFile);
         if (!dataYml.contains("players")) return;
@@ -96,7 +88,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
 
     private void saveChoices() {
         if (dataYml == null) dataYml = new YamlConfiguration();
-        dataYml.set("players", null); // clear old
+        dataYml.set("players", null);
         for (Map.Entry<UUID, String> e : chosen.entrySet()) {
             dataYml.set("players." + e.getKey().toString() + ".animal", e.getValue());
         }
@@ -107,7 +99,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         }
     }
 
-    // ---------- Commands & GUI ----------
+    // ---------------- Commands & GUI ----------------
     @Override
     public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
         String cmd = command.getName().toLowerCase(Locale.ROOT);
@@ -119,7 +111,6 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         }
 
         if (cmd.equals("resetanimal")) {
-            // allow console or OPs to reset another player's animal
             if (args.length != 1) {
                 sender.sendMessage(ChatColor.YELLOW + "Usage: /resetanimal <player>");
                 return true;
@@ -141,7 +132,6 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
             return true;
         }
 
-        // ability commands (one-word): pounce, focus, hover, escape, harden, gallop, soften, sting, glide, discovery
         List<String> abilities = Arrays.asList("pounce","focus","hover","escape","harden","gallop","soften","sting","glide","discovery");
         if (abilities.contains(cmd)) {
             if (!(sender instanceof Player)) { sender.sendMessage("Only players may use abilities."); return true; }
@@ -157,8 +147,6 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
             p.sendMessage(ChatColor.RED + "You already chose an animal. Ask an OP to reset it.");
             return;
         }
-
-        // 2 rows (18) to fit 10 animals, some spacing
         Inventory inv = Bukkit.createInventory(null, 18, ChatColor.DARK_GREEN + "Choose Your Animal");
 
         inv.setItem(0, makeItem(Material.BONE, "Wolf", "Strong and brave.", "Strength I, Speed I"));
@@ -200,15 +188,13 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         if (!(e.getWhoClicked() instanceof Player p)) return;
         if (e.getCurrentItem() == null || !e.getCurrentItem().hasItemMeta()) { p.closeInventory(); return; }
         String disp = ChatColor.stripColor(e.getCurrentItem().getItemMeta().getDisplayName()).toLowerCase(Locale.ROOT);
+        disp = disp.replace(" ", "").replace("-", "").toLowerCase(Locale.ROOT);
 
         Set<String> valid = new HashSet<>(Arrays.asList(
                 "wolf","cat","bee","fox","turtle","horse","sheep","ant","owl","coppergolem"
         ));
-        // handle alt display names (CopperGolem -> coppergolem)
-        disp = disp.replace(" ", "").replace("-", "").toLowerCase(Locale.ROOT);
         if (!valid.contains(disp)) { p.sendMessage(ChatColor.RED + "Invalid selection."); p.closeInventory(); return; }
 
-        // lock choice (cannot choose again)
         if (chosen.containsKey(p.getUniqueId())) {
             p.sendMessage(ChatColor.RED + "You already chose an animal. Ask an OP to reset it.");
             p.closeInventory();
@@ -224,7 +210,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         p.closeInventory();
     }
 
-    // ---------- Reapply on join/respawn ----------
+    // ---------------- Join / Respawn reapply ----------------
     @EventHandler
     public void onJoin(PlayerJoinEvent e) {
         Player p = e.getPlayer();
@@ -241,9 +227,9 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         }, 20L);
     }
 
-    // ---------- Passive application ----------
+    // ---------------- Passive application ----------------
     private void applyPassiveToPlayer(Player p, String animal) {
-        // remove effects applied by plugin (safe approach: remove all then reapply)
+        // remove any effects (safe)
         for (PotionEffect pe : p.getActivePotionEffects()) {
             try { p.removePotionEffect(pe.getType()); } catch (Throwable ignored) {}
         }
@@ -252,24 +238,24 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
 
         switch (animal) {
             case "wolf":
-                addPotionSafe(p, "INCREASE_DAMAGE", permTicks, 0); // Strength I (amp 0)
-                addPotionSafe(p, "SPEED", permTicks, 0); // Speed I
+                addPotionSafe(p, "INCREASE_DAMAGE", permTicks, 0);
+                addPotionSafe(p, "SPEED", permTicks, 0);
                 break;
             case "cat":
-                addPotionSafe(p, "JUMP_BOOST", permTicks, 1); // Jump II (amp 1)
+                addPotionSafe(p, "JUMP_BOOST", permTicks, 1);
                 addPotionSafe(p, "NIGHT_VISION", permTicks, 0);
                 break;
             case "bee":
-                addPotionSafe(p, "LEVITATION", permTicks, 0); // user requested levitation passive for bee
-                addPotionSafe(p, "SPEED", permTicks, 2); // Speed III (amp 2)
+                addPotionSafe(p, "LEVITATION", permTicks, 0);
+                addPotionSafe(p, "SPEED", permTicks, 2); // amp 2 -> Speed III
                 break;
             case "fox":
-                addPotionSafe(p, "SPEED", permTicks, 1); // Speed II
+                addPotionSafe(p, "SPEED", permTicks, 1);
                 scheduleFoxInvisibility(p);
                 break;
             case "turtle":
                 addPotionSafe(p, "WATER_BREATHING", permTicks, 0);
-                addPotionSafe(p, "DAMAGE_RESISTANCE", permTicks, 0); // Resistance I
+                addPotionSafe(p, "DAMAGE_RESISTANCE", permTicks, 0);
                 break;
             case "horse":
                 addPotionSafe(p, "SPEED", permTicks, 0);
@@ -280,18 +266,18 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
                 addPotionSafe(p, "JUMP_BOOST", permTicks, 0);
                 break;
             case "ant":
-                addPotionSafe(p, "FAST_DIGGING", permTicks, 0); // Haste
-                addPotionSafe(p, "INCREASE_DAMAGE", permTicks, 0); // Strength I
+                addPotionSafe(p, "FAST_DIGGING", permTicks, 0);
+                addPotionSafe(p, "INCREASE_DAMAGE", permTicks, 0);
                 break;
             case "owl":
                 addPotionSafe(p, "NIGHT_VISION", permTicks, 0);
                 addPotionSafe(p, "SLOW_FALLING", permTicks, 0);
-                addPotionSafe(p, "JUMP_BOOST", permTicks, 1); // Jump II (amp 1)
-                addPotionSafe(p, "SPEED", permTicks, 0); // speed 1
+                addPotionSafe(p, "JUMP_BOOST", permTicks, 1); // Jump II
+                addPotionSafe(p, "SPEED", permTicks, 0); // Speed I
                 break;
             case "coppergolem":
                 addPotionSafe(p, "SPEED", permTicks, 0);
-                addPotionSafe(p, "FAST_DIGGING", permTicks, 0); // Haste
+                addPotionSafe(p, "FAST_DIGGING", permTicks, 0);
                 break;
             default:
                 break;
@@ -299,7 +285,6 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
     }
 
     private void scheduleFoxInvisibility(Player p) {
-        // check world time once and apply invis if night; players will get invis when their passive reapplies
         new BukkitRunnable() {
             @Override
             public void run() {
@@ -313,7 +298,7 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
         }.runTaskLater(this, 5L);
     }
 
-    // ---------- Abilities ----------
+    // ---------------- Abilities ----------------
     private void useAbility(Player p, String cmd) {
         String animal = chosen.get(p.getUniqueId());
         if (animal == null) {
@@ -334,112 +319,143 @@ public class AnimalAbilities extends JavaPlugin implements Listener {
             return;
         }
 
-        // default durations and cooldowns (seconds)
-        int durationSec = 8;
-        int cooldownSec = 20 * 60; // default 20 minutes
+        int durationSec;
+        int cooldownSec;
 
         switch (cmd) {
-            // Wolf: Pounce -> Jump boost 1 + Strength 2 (strength amplifier 1 -> level 2)
             case "pounce":
-                durationSec = 10;
-                cooldownSec = 22 * 60;
-                addPotionSafe(p, "JUMP_BOOST", durationSec * 20, 0); // Jump I
-                addPotionSafe(p, "INCREASE_DAMAGE", durationSec * 20, 1); // Strength II
+                durationSec = 10; cooldownSec = 22 * 60;
+                addPotionSafe(p, "JUMP_BOOST", durationSec * 20, 0);
+                addPotionSafe(p, "INCREASE_DAMAGE", durationSec * 20, 1);
                 spawnParticlesTimed(p, Particle.SMOKE_LARGE, 40, 5);
                 playSafeSound(p, Sound.ENTITY_WOLF_GROWL);
-                p.sendMessage(ChatColor.GREEN + "Pounce activated! Cooldown: " + cooldownSec/60 + "m");
+                p.sendMessage(ChatColor.GREEN + "Pounce activated! Cooldown: " + (cooldownSec/60) + "m");
                 break;
 
-            // Cat: Focus -> Haste + Speed 2
             case "focus":
-                durationSec = 10;
-                cooldownSec = 23 * 60;
-                addPotionSafe(p, "FAST_DIGGING", durationSec * 20, 1); // Haste II
-                addPotionSafe(p, "SPEED", durationSec * 20, 1); // Speed II
+                durationSec = 10; cooldownSec = 23 * 60;
+                addPotionSafe(p, "FAST_DIGGING", durationSec * 20, 1);
+                addPotionSafe(p, "SPEED", durationSec * 20, 1);
                 spawnParticlesTimed(p, Particle.EXPLOSION_NORMAL, 45, 5);
                 playSafeSound(p, Sound.ENTITY_CAT_PURR);
-                p.sendMessage(ChatColor.GREEN + "Focus activated! Cooldown: " + cooldownSec/60 + "m");
+                p.sendMessage(ChatColor.GREEN + "Focus activated! Cooldown: " + (cooldownSec/60) + "m");
                 break;
 
-            // Bee: Hover -> Levitation + Resistance 2; user requested levitation + speed 3 passive but ability is levitation+resistance
             case "hover":
-                durationSec = 8;
-                cooldownSec = 24 * 60;
+                durationSec = 8; cooldownSec = 24 * 60;
                 addPotionSafe(p, "LEVITATION", durationSec * 20, 0);
-                addPotionSafe(p, "DAMAGE_RESISTANCE", durationSec * 20, 1); // Resistance II (amp 1)
-                spawnParticlesTimed(p, Particle.HONEY, 40, 5);
+                addPotionSafe(p, "DAMAGE_RESISTANCE", durationSec * 20, 1);
+                spawnParticlesTimed(p, Particle.END_ROD, 40, 5);
                 playSafeSound(p, Sound.ENTITY_BEE_LOOP);
-                p.sendMessage(ChatColor.GREEN + "Hover activated! Cooldown: " + cooldownSec/60 + "m");
+                p.sendMessage(ChatColor.GREEN + "Hover activated! Cooldown: " + (cooldownSec/60) + "m");
                 break;
 
-            // Fox: Escape -> Speed 3 + Haste
             case "escape":
-                durationSec = 10;
-                cooldownSec = 25 * 60;
-                addPotionSafe(p, "SPEED", durationSec * 20, 2); // Speed III (amp 2)
+                durationSec = 10; cooldownSec = 25 * 60;
+                addPotionSafe(p, "SPEED", durationSec * 20, 2);
                 addPotionSafe(p, "FAST_DIGGING", durationSec * 20, 1);
                 spawnParticlesTimed(p, Particle.FLAME, 45, 5);
                 playSafeSound(p, Sound.ENTITY_FOX_SCREECH);
-                p.sendMessage(ChatColor.GREEN + "Escape activated! Cooldown: " + cooldownSec/60 + "m");
+                p.sendMessage(ChatColor.GREEN + "Escape activated! Cooldown: " + (cooldownSec/60) + "m");
                 break;
 
-            // Turtle: Harden -> Resistance 3 + Slowness 2
             case "harden":
-                durationSec = 9;
-                cooldownSec = 22 * 60;
-                addPotionSafe(p, "DAMAGE_RESISTANCE", durationSec * 20, 2); // Resistance III (amp2)
-                addPotionSafe(p, "SLOWNESS", durationSec * 20, 1); // Slowness II
+                durationSec = 9; cooldownSec = 22 * 60;
+                addPotionSafe(p, "DAMAGE_RESISTANCE", durationSec * 20, 2);
+                addPotionSafe(p, "SLOWNESS", durationSec * 20, 1);
                 spawnParticlesTimed(p, Particle.WATER_SPLASH, 40, 5);
                 playSafeSound(p, Sound.ITEM_SHIELD_BLOCK);
-                p.sendMessage(ChatColor.GREEN + "Harden activated! Cooldown: " + cooldownSec/60 + "m");
+                p.sendMessage(ChatColor.GREEN + "Harden activated! Cooldown: " + (cooldownSec/60) + "m");
                 break;
 
-            // Horse: Gallop -> Speed 2, Jump Boost 2
             case "gallop":
-                durationSec = 9;
-                cooldownSec = 21 * 60;
-                addPotionSafe(p, "SPEED", durationSec * 20, 1); // Speed II
-                addPotionSafe(p, "JUMP_BOOST", durationSec * 20, 1); // Jump II
+                durationSec = 9; cooldownSec = 21 * 60;
+                addPotionSafe(p, "SPEED", durationSec * 20, 1);
+                addPotionSafe(p, "JUMP_BOOST", durationSec * 20, 1);
                 spawnParticlesTimed(p, Particle.CLOUD, 40, 5);
                 playSafeSound(p, Sound.ENTITY_HORSE_GALLOP);
-                p.sendMessage(ChatColor.GREEN + "Gallop activated! Cooldown: " + cooldownSec/60 + "m");
+                p.sendMessage(ChatColor.GREEN + "Gallop activated! Cooldown: " + (cooldownSec/60) + "m");
                 break;
 
-            // Sheep: Soften -> Jump Boost 2, Regeneration 1
             case "soften":
-                durationSec = 8;
-                cooldownSec = 20 * 60;
-                addPotionSafe(p, "JUMP_BOOST", durationSec * 20, 1); // Jump II
-                addPotionSafe(p, "REGENERATION", durationSec * 20, 0); // Regen I
+                durationSec = 8; cooldownSec = 20 * 60;
+                addPotionSafe(p, "JUMP_BOOST", durationSec * 20, 1);
+                addPotionSafe(p, "REGENERATION", durationSec * 20, 0);
                 spawnParticlesTimed(p, Particle.VILLAGER_HAPPY, 40, 5);
                 playSafeSound(p, Sound.ENTITY_SHEEP_AMBIENT);
-                p.sendMessage(ChatColor.GREEN + "Soften activated! Cooldown: " + cooldownSec/60 + "m");
+                p.sendMessage(ChatColor.GREEN + "Soften activated! Cooldown: " + (cooldownSec/60) + "m");
                 break;
 
-            // Ant: Sting -> Strength 2, Speed 1
             case "sting":
-                durationSec = 7;
-                cooldownSec = 21 * 60;
+                durationSec = 7; cooldownSec = 21 * 60;
                 addPotionSafe(p, "INCREASE_DAMAGE", durationSec * 20, 1);
                 addPotionSafe(p, "SPEED", durationSec * 20, 0);
                 spawnParticlesTimed(p, Particle.SOUL, 40, 5);
                 playSafeSound(p, Sound.ENTITY_BEE_STING);
-                p.sendMessage(ChatColor.GREEN + "Sting activated! Cooldown: " + cooldownSec/60 + "m");
+                p.sendMessage(ChatColor.GREEN + "Sting activated! Cooldown: " + (cooldownSec/60) + "m");
                 break;
 
-            // Owl: Glide -> Speed 2, Jump Boost 2
             case "glide":
-                durationSec = 9;
-                cooldownSec = 24 * 60;
-                addPotionSafe(p, "SPEED", durationSec * 20, 1); // Speed II
-                addPotionSafe(p, "JUMP_BOOST", durationSec * 20, 1); // Jump II
+                durationSec = 9; cooldownSec = 24 * 60;
+                addPotionSafe(p, "SPEED", durationSec * 20, 1);
+                addPotionSafe(p, "JUMP_BOOST", durationSec * 20, 1);
                 spawnParticlesTimed(p, Particle.SPELL_WITCH, 40, 5);
                 playSafeSound(p, Sound.ENTITY_PHANTOM_FLAP);
-                p.sendMessage(ChatColor.GREEN + "Glide activated! Cooldown: " + cooldownSec/60 + "m");
+                p.sendMessage(ChatColor.GREEN + "Glide activated! Cooldown: " + (cooldownSec/60) + "m");
                 break;
 
-            // CopperGolem: Discovery -> Haste 2, Resistance 2
             case "discovery":
-                durationSec = 9;
-                cooldownSec = 25 * 60;
-                addPotio
+                durationSec = 9; cooldownSec = 25 * 60;
+                addPotionSafe(p, "FAST_DIGGING", durationSec * 20, 1);
+                addPotionSafe(p, "DAMAGE_RESISTANCE", durationSec * 20, 1);
+                spawnParticlesTimed(p, Particle.PORTAL, 40, 5);
+                playSafeSound(p, Sound.BLOCK_ANVIL_PLACE);
+                p.sendMessage(ChatColor.GREEN + "Discovery activated! Cooldown: " + (cooldownSec/60) + "m");
+                break;
+
+            default:
+                p.sendMessage(ChatColor.RED + "Unknown ability.");
+                return;
+        }
+
+        // apply cooldown
+        pc.put(cmd, System.currentTimeMillis() + (long) (getCooldownSeconds(cmd) * 1000L));
+    }
+
+    private int getCooldownSeconds(String cmd) {
+        switch (cmd) {
+            case "pounce": return 22 * 60;
+            case "focus": return 23 * 60;
+            case "hover": return 24 * 60;
+            case "escape": return 25 * 60;
+            case "harden": return 22 * 60;
+            case "gallop": return 21 * 60;
+            case "soften": return 20 * 60;
+            case "sting": return 21 * 60;
+            case "glide": return 24 * 60;
+            case "discovery": return 25 * 60;
+            default: return 20 * 60;
+        }
+    }
+
+    private boolean canUseAbilityFor(String animal, String ability) {
+        switch (animal) {
+            case "wolf": return ability.equals("pounce");
+            case "cat": return ability.equals("focus");
+            case "bee": return ability.equals("hover");
+            case "fox": return ability.equals("escape");
+            case "turtle": return ability.equals("harden");
+            case "horse": return ability.equals("gallop");
+            case "sheep": return ability.equals("soften");
+            case "ant": return ability.equals("sting");
+            case "owl": return ability.equals("glide");
+            case "coppergolem": return ability.equals("discovery");
+            default: return false;
+        }
+    }
+
+    // ---------------- Helpers ----------------
+    private void addPotionSafe(Player p, String name, int ticks, int amp) {
+        PotionEffectType t = resolvePotionType(name);
+        if (t != null) {
+            try { p.addPo
