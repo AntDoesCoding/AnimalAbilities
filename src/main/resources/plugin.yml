@@ -1,34 +1,29 @@
-# File: plugin.yml
 name: AnimalAbilities
 main: com.animalabilities.AnimalAbilities
 version: 1.0.0
-api-version: "1.21"
-description: "AnimalAbilities plugin - choose an animal and use unique abilities"
-
+api-version: 1.21
+author: Gabriel
+description: Minecraft plugin that adds animal abilities and powers.
 commands:
   chooseanimal:
-    description: "Open the animal chooser GUI"
-    usage: "/chooseanimal"
+    description: Choose your animal and gain its passive effects.
+    usage: /chooseanimal <animal>
+    permission: animalabilities.choose
+  ability:
+    description: Activate your chosen animal's ability.
+    usage: /ability
+    permission: animalabilities.ability
   resetanimal:
-    description: "Reset a player's chosen animal (OP only)"
-    usage: "/resetanimal <player>"
-  pounce:
-    description: "Wolf ability - Pounce"
-  focus:
-    description: "Cat ability - Focus"
-  hover:
-    description: "Bee ability - Hover"
-  escape:
-    description: "Fox ability - Escape"
-  harden:
-    description: "Turtle ability - Harden"
-  gallop:
-    description: "Horse ability - Gallop"
-  soften:
-    description: "Sheep ability - Soften"
-  sting:
-    description: "Ant ability - Sting"
-  glide:
-    description: "Owl ability - Glide"
-  discovery:
-    description: "CopperGolem ability - Discovery"
+    description: Reset your animal (yourself or others if OP).
+    usage: /resetanimal [player|@a]
+    permission: animalabilities.reset
+permissions:
+  animalabilities.choose:
+    description: Allows the player to choose an animal.
+    default: true
+  animalabilities.ability:
+    description: Allows the player to use their animal ability.
+    default: true
+  animalabilities.reset:
+    description: Allows resetting player animals.
+    default: op
