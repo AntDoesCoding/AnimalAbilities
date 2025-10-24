@@ -1,30 +1,34 @@
-# File: src/main/resources/plugin.yml
+# File: plugin.yml
 name: AnimalAbilities
 main: com.animalabilities.AnimalAbilities
 version: 1.0.0
-api-version: 1.21
+api-version: "1.21"
+description: "AnimalAbilities plugin - choose an animal and use unique abilities"
+
 commands:
   chooseanimal:
-    description: Open the animal chooser GUI
+    description: "Open the animal chooser GUI"
+    usage: "/chooseanimal"
   resetanimal:
-    description: Reset a player's animal (OP only or console)
+    description: "Reset a player's chosen animal (OP only)"
+    usage: "/resetanimal <player>"
   pounce:
-    description: Wolf ability
+    description: "Wolf ability - Pounce"
   focus:
-    description: Cat ability
+    description: "Cat ability - Focus"
   hover:
-    description: Bee ability
+    description: "Bee ability - Hover"
   escape:
-    description: Fox ability
+    description: "Fox ability - Escape"
   harden:
-    description: Turtle ability
+    description: "Turtle ability - Harden"
   gallop:
-    description: Horse ability
+    description: "Horse ability - Gallop"
   soften:
-    description: Sheep ability
+    description: "Sheep ability - Soften"
   sting:
-    description: Ant ability
+    description: "Ant ability - Sting"
   glide:
-    description: Owl ability
+    description: "Owl ability - Glide"
   discovery:
-    description: Copper Golem ability
+    description: "CopperGolem ability - Discovery"
